@@ -1,7 +1,9 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ServiceWorkerProvider } from '@/components/service-worker-provider'
+import { InstallPrompt } from '@/components/install-prompt'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -12,6 +14,9 @@ export const metadata: Metadata = {
   title: 'Travel & Tours ERP',
   description: 'Complete ERP system for travel and tour management',
   generator: 'v0.app',
+  applicationName: 'Travel ERP',
+  keywords: ['travel', 'tours', 'erp', 'booking', 'management'],
+  manifest: '/manifest.json',
   icons: {
     icon: [
       {
@@ -31,6 +36,17 @@ export const metadata: Metadata = {
   },
 }
 
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#0A2540' },
+  ],
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,11 +54,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Travel ERP" />
+        <meta name="msapplication-TileColor" content="#0A2540" />
+        <meta name="msapplication-config" content="/browserconfig.xml" />
+      </head>
       <body className="font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <ServiceWorkerProvider>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+            <InstallPrompt />
+            {children}
+            <Toaster />
+          </ThemeProvider>
+        </ServiceWorkerProvider>
         <Analytics />
       </body>
     </html>
