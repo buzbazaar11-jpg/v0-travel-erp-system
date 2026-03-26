@@ -40,6 +40,11 @@ export default function HomePage() {
               Sign In
             </Button>
           </Link>
+          <Link href="/auth/demo-credentials">
+            <Button size="lg" variant="secondary">
+              Demo Credentials
+            </Button>
+          </Link>
         </div>
       </section>
 

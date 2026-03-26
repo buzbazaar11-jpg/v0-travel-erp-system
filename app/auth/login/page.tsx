@@ -28,8 +28,8 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>
 
 export default function Page() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('admin@eagent.com')
+  const [password, setPassword] = useState('Mezu@1107')
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<Partial<LoginForm>>({})
   const [isLoading, setIsLoading] = useState(false)
