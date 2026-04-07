@@ -5,59 +5,25 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Search, Download, Eye, Send, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Plus, Search, Download, Eye, Send, Trash2, Edit2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 
-const SAMPLE_INVOICES = [
-  {
-    id: 'INV-2025-0001',
-    customer: 'Ahmed Hassan',
-    bookingId: 'BK-2025-001',
-    date: '2025-03-15',
-    dueDate: '2025-03-22',
-    subtotal: 375000,
-    gst: 63750,
-    total: 438750,
-    paid: 438750,
-    status: 'PAID',
-  },
-  {
-    id: 'INV-2025-0002',
-    customer: 'Bright Travels Ltd',
-    bookingId: 'BK-2025-002',
-    date: '2025-03-10',
-    dueDate: '2025-04-10',
-    subtotal: 5000000,
-    gst: 850000,
-    total: 5850000,
-    paid: 2925000,
-    status: 'PARTIAL',
-  },
-  {
-    id: 'INV-2025-0003',
-    customer: 'Zainab Ali',
-    bookingId: 'BK-2025-003',
-    date: '2025-03-18',
-    dueDate: '2025-03-25',
-    subtotal: 85000,
-    gst: 14450,
-    total: 99450,
-    paid: 0,
-    status: 'PENDING',
-  },
-  {
-    id: 'INV-2025-0004',
-    customer: 'Hassan Malik',
-    bookingId: 'BK-2025-004',
-    date: '2025-03-12',
-    dueDate: '2025-04-12',
-    subtotal: 50000,
-    gst: 8500,
-    total: 58500,
-    paid: 58500,
-    status: 'PAID',
-  },
-]
+interface Invoice {
+  id: string
+  invoice_number: string
+  customer_name: string
+  bookingId: string
+  invoice_date: string
+  due_date: string
+  subtotal: number
+  gst: number
+  total: number
+  paid: number
+  status: string
+}
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -75,13 +41,110 @@ const getStatusColor = (status: string) => {
 }
 
 export default function InvoicesPage() {
-  const [invoices, setInvoices] = useState(SAMPLE_INVOICES)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [isOpen, setIsOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    customer_name: '',
+    bookingId: '',
+    invoice_date: new Date().toISOString().split('T')[0],
+    due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    subtotal: 0,
+    gst_rate: 17,
+    discount: 0,
+  })
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
+
+  const fetchInvoices = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('/api/invoices')
+      const data = await response.json()
+      setInvoices(data || [])
+    } catch (error) {
+      toast.error('Failed to load invoices')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const gst = (formData.subtotal * formData.gst_rate) / 100
+    const total = formData.subtotal + gst - formData.discount
+
+    try {
+      if (editingId) {
+        await fetch(`/api/invoices/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...formData, gst, total }),
+        })
+        toast.success('Invoice updated')
+      } else {
+        await fetch('/api/invoices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...formData, gst, total }),
+        })
+        toast.success('Invoice created')
+      }
+      fetchInvoices()
+      setIsOpen(false)
+      resetForm()
+    } catch (error) {
+      toast.error('Error saving invoice')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (confirm('Delete this invoice?')) {
+      try {
+        await fetch(`/api/invoices/${id}`, { method: 'DELETE' })
+        toast.success('Invoice deleted')
+        fetchInvoices()
+      } catch (error) {
+        toast.error('Failed to delete')
+      }
+    }
+  }
+
+  const handleEdit = (invoice: Invoice) => {
+    setFormData({
+      customer_name: invoice.customer_name,
+      bookingId: invoice.bookingId,
+      invoice_date: invoice.invoice_date,
+      due_date: invoice.due_date,
+      subtotal: invoice.subtotal,
+      gst_rate: 17,
+      discount: invoice.subtotal + invoice.gst - invoice.total,
+    })
+    setEditingId(invoice.id)
+    setIsOpen(true)
+  }
+
+  const resetForm = () => {
+    setFormData({
+      customer_name: '',
+      bookingId: '',
+      invoice_date: new Date().toISOString().split('T')[0],
+      due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      subtotal: 0,
+      gst_rate: 17,
+      discount: 0,
+    })
+    setEditingId(null)
+  }
 
   const filteredInvoices = invoices.filter((invoice) => {
-    const matchesSearch = invoice.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       invoice.bookingId.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || invoice.status === statusFilter
     return matchesSearch && matchesStatus
@@ -102,10 +165,54 @@ export default function InvoicesPage() {
           <h1 className="text-3xl font-bold text-foreground">Invoices</h1>
           <p className="text-muted-foreground mt-1">Manage customer invoices and billing</p>
         </div>
-        <Button className="gap-2">
-          <Plus className="w-4 h-4" />
-          Create Invoice
-        </Button>
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2" onClick={resetForm}>
+              <Plus className="w-4 h-4" />
+              Create Invoice
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingId ? 'Edit Invoice' : 'Create Invoice'}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <Label>Customer Name</Label>
+                <Input value={formData.customer_name} onChange={(e) => setFormData({...formData, customer_name: e.target.value})} placeholder="Enter customer name" required />
+              </div>
+              <div>
+                <Label>Booking ID</Label>
+                <Input value={formData.bookingId} onChange={(e) => setFormData({...formData, bookingId: e.target.value})} placeholder="BK-2025-001" required />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Invoice Date</Label>
+                  <Input type="date" value={formData.invoice_date} onChange={(e) => setFormData({...formData, invoice_date: e.target.value})} required />
+                </div>
+                <div>
+                  <Label>Due Date</Label>
+                  <Input type="date" value={formData.due_date} onChange={(e) => setFormData({...formData, due_date: e.target.value})} required />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Subtotal (Rs)</Label>
+                  <Input type="number" value={formData.subtotal} onChange={(e) => setFormData({...formData, subtotal: parseFloat(e.target.value) || 0})} required />
+                </div>
+                <div>
+                  <Label>Discount (Rs)</Label>
+                  <Input type="number" value={formData.discount} onChange={(e) => setFormData({...formData, discount: parseFloat(e.target.value) || 0})} />
+                </div>
+              </div>
+              <div className="bg-blue-50 p-3 rounded">
+                <p className="text-sm">GST (17%): Rs {((formData.subtotal * 17) / 100).toLocaleString()}</p>
+                <p className="text-sm font-bold">Total: Rs {(formData.subtotal + (formData.subtotal * 17) / 100 - formData.discount).toLocaleString()}</p>
+              </div>
+              <Button type="submit" className="w-full">{editingId ? 'Update Invoice' : 'Create Invoice'}</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}
@@ -184,11 +291,11 @@ export default function InvoicesPage() {
             <tbody>
               {filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-border/40 hover:bg-muted/30">
-                  <td className="px-6 py-4 text-sm font-bold text-primary">{invoice.id}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-foreground">{invoice.customer}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-primary">{invoice.invoice_number}</td>
+                  <td className="px-6 py-4 text-sm font-medium text-foreground">{invoice.customer_name}</td>
                   <td className="px-6 py-4 text-sm text-muted-foreground">{invoice.bookingId}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{invoice.date}</td>
-                  <td className="px-6 py-4 text-sm text-muted-foreground">{invoice.dueDate}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{invoice.invoice_date}</td>
+                  <td className="px-6 py-4 text-sm text-muted-foreground">{invoice.due_date}</td>
                   <td className="px-6 py-4 text-sm font-bold text-right">
                     PKR {invoice.total.toLocaleString()}
                   </td>
@@ -203,10 +310,10 @@ export default function InvoicesPage() {
                       <Button variant="ghost" size="sm" className="p-1" title="View">
                         <Eye className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="p-1" title="Send">
-                        <Send className="w-4 h-4" />
+                      <Button variant="ghost" size="sm" className="p-1" onClick={() => handleEdit(invoice)} title="Edit">
+                        <Edit2 className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="p-1 text-destructive" title="Delete">
+                      <Button variant="ghost" size="sm" className="p-1 text-destructive" onClick={() => handleDelete(invoice.id)} title="Delete">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
